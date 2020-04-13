@@ -1,4 +1,6 @@
 const express = require("express");
+require("dotenv").config();
+const mongoose = require("mongoose");
 const HttpError = require("./models/http-error");
 
 //#region router-imports
@@ -43,8 +45,19 @@ app.use((error, req, res, next) => {
 
 //#region Server Initialization
 
-const PORT = process.env.PORT || 5000;
+mongoose
+  .connect(process.env.DB_CONNECTION_URI, {
+    useUnifiedTopology: true,
+    useNewUrlParser: true,
+  })
+  .then(() => {
+    const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => `app running on port ${PORT}`);
+    app.listen(PORT, () => console.log(`app running on port ${PORT}`));
+  })
+  .catch((error) => {
+    console.log(error);
+    process.exit(1);
+  });
 
 //#endregion Server Initialization

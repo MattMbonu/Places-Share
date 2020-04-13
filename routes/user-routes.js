@@ -10,13 +10,17 @@ router.get("/", usersControllers.getUsers);
 
 router.post(
   "/signup",
-  check("name").not().isEmpty(),
+  [
+    check("name").not().isEmpty(),
+    check("email").isEmail(),
+    check("password").not().isEmpty(),
+  ],
   usersControllers.signupUser
 );
 
 router.post(
   "/login",
-  check("name").not().isEmpty(),
+  [check("email").isEmail(), check("password").not().isEmpty()],
   usersControllers.loginUser
 );
 
