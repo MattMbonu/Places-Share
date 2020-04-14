@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+require("dotenv").config();
 
 const User = require("../../models/users");
 
@@ -44,13 +45,19 @@ function seedUsers() {
 }
 
 mongoose
-  .connect(
-    "mongodb+srv://mmbonu:dmjjmd123@cluster0-7mzem.mongodb.net/test?retryWrites=true&w=majority",
-    { useUnifiedTopology: true, useNewUrlParser: true }
-  )
-  .then(() => {
+  .connect(process.env.DB_CONNECTION_URI, {
+    useUnifiedTopology: true,
+    useNewUrlParser: true,
+  })
+  .then(async () => {
     console.log("connected to db");
-    seedUsers();
+    try {
+      await User.collection.drop();
+      seedUsers();
+    } catch (error) {
+      console.log(error);
+      process.exit(1);
+    }
   })
   .catch((error) => {
     console.log(error);

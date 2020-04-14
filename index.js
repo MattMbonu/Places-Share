@@ -51,6 +51,15 @@ mongoose
     useNewUrlParser: true,
   })
   .then(() => {
+    mongoose.connection.db.listCollections().toArray(function (err, names) {
+      if (err) {
+        console.log(err);
+      } else {
+        for (i = 0; i < names.length; i++) {
+          console.log(names[i].name);
+        }
+      }
+    });
     const PORT = process.env.PORT || 5000;
 
     app.listen(PORT, () => console.log(`app running on port ${PORT}`));

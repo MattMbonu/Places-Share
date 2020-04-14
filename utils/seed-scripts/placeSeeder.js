@@ -57,9 +57,15 @@ mongoose
     useUnifiedTopology: true,
     useNewUrlParser: true,
   })
-  .then(() => {
-    console.log("connected to db");
-    seedPlaces();
+  .then(async () => {
+    try {
+      console.log("connected to db");
+      await Place.collection.drop();
+      seedPlaces();
+    } catch (error) {
+      console.log(error);
+      process.exit(1);
+    }
   })
   .catch((error) => {
     console.log(error);

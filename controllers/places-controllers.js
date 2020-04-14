@@ -7,40 +7,42 @@ const getCoordsForAddress = require("../utils/location-api/locations");
 
 const HttpError = require("../models/http-error");
 
-function makelocations() {
-  let locations = [];
-  for (let i = 0; i < 10; i++) {
-    locations.push({
-      id: `${i}`,
-      title: `Eiffel number ${i}`,
-      description: "my fav description",
-      location: {
-        lat: 40.7484474,
-        lng: -73.9871516,
-      },
-      address: `my favoirte address number ${1}`,
-      creator: `matt jumber ${i}`,
-    });
-  }
-  return locations;
-}
-
-let DUMMY_LOCATIONS = makelocations();
-
 exports.getLocationByPlaceID = async (req, res, next) => {
-  const place = await Place.findById({ _id: req.params.pid });
+  let place;
+
+  try {
+    place = await Place.findById({ _id: req.params.pid });
+  } catch (error) {
+    return next(
+      new HttpError("Something went wrong could not find place", 500)
+    );
+  }
+
   if (!place) {
     return next(new HttpError("No Location Found", 404));
   }
-  return res.json({ place });
+  return res.json({ place: place.toObject({ getters: true }) });
 };
 
 exports.getLocationsByUserID = async (req, res, next) => {
-  const locations = await Place.find({ creator: req.params.uid });
-  if (!locations) {
-    return next(new HttpError("No Location Found", 404));
+  let locations;
+
+  try {
+    locations = await Place.find({ creator: req.params.uid });
+  } catch (error) {
+    return next(
+      new HttpError("Something went wrong could not find places", 500)
+    );
   }
-  return res.json({ locations });
+
+  if (!locations || locations.length === 0) {
+    return next(new HttpError("No Location(s) Found", 404));
+  }
+  return res.json({
+    locations: locations.map((location) =>
+      location.toObject({ getters: true })
+    ),
+  });
 };
 
 exports.createNewPlace = async (req, res, next) => {
@@ -49,7 +51,7 @@ exports.createNewPlace = async (req, res, next) => {
     console.log(errors);
     return next(new HttpError("Please complete all fields", 422));
   }
-  const { title, description, address, creator } = req.body;
+  const { title, description, address } = req.body;
 
   let coordinates;
 
@@ -71,10 +73,12 @@ exports.createNewPlace = async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
-  return res.status(201).json({ newLocation });
+  return res
+    .status(201)
+    .json({ newLocation: newLocation.toObject({ getters: true }) });
 };
 
-exports.updatePlace = (req, res, next) => {
+exports.updatePlace = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     console.log(errors);
@@ -82,23 +86,28 @@ exports.updatePlace = (req, res, next) => {
   }
   const { title, description } = req.body;
 
-  const selectedIndex = DUMMY_LOCATIONS.findIndex(
-    (location) => location.id == req.params.pid
-  );
-  const selectedPlace = DUMMY_LOCATIONS[selectedIndex];
-  const updatedPlace = {
-    ...selectedPlace,
-    title,
-    description,
-  };
+  let selectedPlace;
 
-  DUMMY_LOCATIONS[selectedIndex] = updatedPlace;
-  return res.status(200).json({ place: updatedPlace });
+  try {
+    selectedPlace = await Place.findById({ _id: req.params.pid });
+    selectedPlace.title = title;
+    selectedPlace.description = description;
+
+    await selectedPlace.save();
+  } catch (error) {
+    return next(error);
+  }
+
+  return res
+    .status(200)
+    .json({ place: selectedPlace.toObject({ getters: true }) });
 };
 
-exports.deletePlace = (req, res, next) => {
-  DUMMY_LOCATIONS = DUMMY_LOCATIONS.filter(
-    (location) => location.id !== req.params.pid
-  );
+exports.deletePlace = async (req, res, next) => {
+  try {
+    await Place.findByIdAndDelete({ _id: req.params.pid });
+  } catch (error) {
+    return next(error);
+  }
   return res.status(200);
 };
