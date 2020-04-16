@@ -8,22 +8,15 @@ const User = require("../models/users");
 
 const HttpError = require("../models/http-error");
 
-function makeUsers() {
-  let users = [];
-  for (let i = 0; i < 1000; i++) {
-    users.push({
-      id: i,
-      name: `matther number ${i}`,
-      email: `matt${i}@deffnotfake.com`,
-      password: "abcabc",
-    });
-  }
-  return users;
-}
-
 exports.getUsers = async (req, res, next) => {
-  const users = await User.find();
-  return res.json({ users });
+  try {
+    const users = await User.find().select("-password");
+    return res.json({
+      users: users.map((user) => user.toObject({ getters: true })),
+    });
+  } catch (error) {
+    return next(new HttpError("Something went wrong", 500));
+  }
 };
 
 exports.signupUser = async (req, res, next) => {
@@ -34,18 +27,33 @@ exports.signupUser = async (req, res, next) => {
   const { name, email, password } = req.body;
 
   // see if user exists
-  let user = await User.findOne({ email });
-  if (user) {
-    return next(new HttpError("User already exists", 400));
+  try {
+    let user = await User.findOne({ email });
+    if (user) {
+      return next(new HttpError("User already exists", 400));
+    }
+  } catch (error) {
+    return next(new HttpError("Something went wrong", 500));
   }
 
   // hash password
-  const salt = await bcrypt.genSalt(10);
-  const encryptedPassword = await bcrypt.hash(password, salt);
+  let newUser;
+  try {
+    const salt = await bcrypt.genSalt(10);
+    const encryptedPassword = await bcrypt.hash(password, salt);
 
-  const newUser = new User({ name, email, password: encryptedPassword });
-  await newUser.save();
-  return res.status(201).json(newUser);
+    newUser = new User({
+      name,
+      email,
+      password: encryptedPassword,
+      places: [],
+    });
+    await newUser.save();
+  } catch (error) {
+    return next(new HttpError("Something went wrong", 500));
+  }
+
+  return res.status(201).json({ newUser: newUser.toObject({ getters: true }) });
 };
 
 exports.loginUser = async (req, res, next) => {
@@ -58,15 +66,15 @@ exports.loginUser = async (req, res, next) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return next(new HttpError("Incorrect credentials", 400));
+      return next(new HttpError("Incorrect credentials", 401));
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return next(new HttpError("Incorrect credentials", 400));
+      return next(new HttpError("Incorrect credentials", 401));
     }
-    return res.status(200).json({ user });
+    return res.status(200).json({ user: user.toObject({ getters: true }) });
   } catch (error) {
-    return next(error);
+    return next(new HttpError("Something went wrong", 500));
   }
 };

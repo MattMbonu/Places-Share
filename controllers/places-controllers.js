@@ -1,7 +1,9 @@
 const { v4: uuid } = require("uuid");
 const { validationResult } = require("express-validator");
+const mongoose = require("mongoose");
 
 const Place = require("../models/places");
+const User = require("../models/users");
 
 const getCoordsForAddress = require("../utils/location-api/locations");
 
@@ -51,7 +53,7 @@ exports.createNewPlace = async (req, res, next) => {
     console.log(errors);
     return next(new HttpError("Please complete all fields", 422));
   }
-  const { title, description, address } = req.body;
+  const { title, description, address, creator } = req.body;
 
   let coordinates;
 
@@ -67,11 +69,29 @@ exports.createNewPlace = async (req, res, next) => {
     location: coordinates,
     address,
     image: "123",
+    creator,
   });
+
+  let user;
   try {
-    await newLocation.save();
+    user = await User.findById(creator);
+
+    if (!user) {
+      return next(new HttpError("Something went wrong", 500));
+    }
   } catch (error) {
-    return next(error);
+    return next(new HttpError("Something went wrong", 500));
+  }
+  try {
+    // start session
+    const sess = await mongoose.startSession();
+    sess.startTransaction();
+    await newLocation.save({ session: sess });
+    user.places.push(newLocation);
+    await user.save({ session: sess });
+    await sess.commitTransaction();
+  } catch (error) {
+    return next(new HttpError("Something went wrong", 500));
   }
   return res
     .status(201)
@@ -104,10 +124,26 @@ exports.updatePlace = async (req, res, next) => {
 };
 
 exports.deletePlace = async (req, res, next) => {
+  let place;
   try {
-    await Place.findByIdAndDelete({ _id: req.params.pid });
+    place = await Place.findById(req.params.pid).populate("creator");
+    if (!place) {
+      return next(new HttpError("Could not find place with provided id", 404));
+    }
   } catch (error) {
     return next(error);
   }
-  return res.status(200);
+  try {
+    const sess = await mongoose.startSession();
+    sess.startTransaction();
+
+    await place.remove({ session: sess });
+    place.creator.places.pull(place);
+    await place.creator.save({ session: sess });
+    sess.commitTransaction();
+  } catch (error) {
+    return next(error);
+  }
+
+  return res.status(200).json({ place });
 };
