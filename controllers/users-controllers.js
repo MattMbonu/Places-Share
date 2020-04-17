@@ -1,5 +1,3 @@
-const { v4: uuid } = require("uuid");
-
 const bcrypt = require("bcryptjs");
 
 const { validationResult } = require("express-validator");
